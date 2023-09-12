@@ -1,4 +1,6 @@
-export const makeHttpHeaders = (path: string, headers: Record<string, string>, body = ""): string => {
+import HTTPParser from "./parser";
+
+export const create_headers = (path: string, headers: Record<string, string>, body = ""): string => {
   const head = [
     `GET ${path} HTTP/1.1`,
     // Add every items from the headers object.
@@ -11,3 +13,20 @@ export const makeHttpHeaders = (path: string, headers: Record<string, string>, b
 
   return head.join("\r\n");
 };
+
+export const read_response = (chunk: Buffer) => {
+  const parser = new HTTPParser();
+  const { consumed, informations } = parser.execute(chunk);
+  
+  if (consumed < chunk.length) {
+    chunk = chunk.subarray(consumed);
+  }
+  else {
+    chunk = Buffer.alloc(0);
+  }
+
+  return {
+    informations,
+    chunk
+  }
+}

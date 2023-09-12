@@ -34,3 +34,11 @@ bun install
 The main source code is located in `./src/index.ts`.
 
 You can run the main examples located in [`./src/examples`](./src/examples)  using `bun run ./examples/simple.ts`, for example.
+
+## Credits
+
+I recycled code from those librairies to write this one.
+
+- <https://github.com/creationix/http-parser-js>
+- <https://github.com/nodejs/undici>
+- <https://github.com/faye/websocket-driver-node>

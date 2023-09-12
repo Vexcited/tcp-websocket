@@ -1,12 +1,14 @@
-# `bun-tcp-websocket`
+# `tcp-websocket`
 
-Was made to resolve this [Bun](https://bun.sh/) issue: <https://github.com/oven-sh/bun/issues/4529>
+Was originally made to resolve this [Bun](https://bun.sh/) issue: <https://github.com/oven-sh/bun/issues/4529> (still not fixed)
 
-## Usage
+Instead of using `node:http` or `node:https`, we use plain TCP sockets to communicate, even for the HTTP request handshake.
+
+## Getting started
 
 ```bash
-# Typings are included
-bun add bun-tcp-websocket 
+bun add tcp-websocket
+pnpm add tcp-websocket
 ```
 
 ```typescript
@@ -14,13 +16,29 @@ import TCPWebSocket from "bun-tcp-websocket";
 
 const ws = new TCPWebSocket("wss://echo-websocket.hoppscotch.io");
 ws.on("open", () => {
-  console.info("connected to websocket");
+  console.info("[open] Connected!");
 });
 
-ws.on("message", (message) => {
-  console.info("received message:", message);
+ws.on("message", (message: Buffer) => {
+  console.info("[message]", message.toString("utf8"));
 });
 ```
+
+## API
+
+> Warning: `TCPWebSocket` class is not fully compatible with the [`WebSocket` interface](https://websockets.spec.whatwg.org/#the-websocket-interface), yet.
+
+## Why not use those librairies ?
+
+Packages using `node:http` or `node:https` to make the request handshake
+will fail within Bun since their implementation is kinda broken.
+
+| Package name on NPM | Issues with Bun |
+| ------------------- | --------------- |
+| [`ws`](https://www.npmjs.com/package/ws) | Uses the `node:http` and `node:https` to make the request handshake. [Source](https://github.com/websockets/ws/blob/7460049ff0a61bef8d5eda4b1d5c8170bc7d6b6f/lib/websocket.js#L715) |
+| [`websocket`](https://www.npmjs.com/package/websocket) | Uses the `node:http` and `node:https` to make the request handshake. [Source](https://github.com/theturtle32/WebSocket-Node/blob/cce6d468986dd356a52af5630fd8ed5726ba5b7a/lib/WebSocketClient.js#L254) |
+| [`websocket-driver`](https://www.npmjs.com/package/websocket-driver) | Works with Bun, but last update was 3 years ago with no TS declarations and ES5 syntax. This package reuses a lot of code from this package. |
+
 
 ## Development
 
@@ -37,8 +55,12 @@ You can run the main examples located in [`./src/examples`](./src/examples)  usi
 
 ## Credits
 
-I recycled code from those librairies to write this one.
-
-- <https://github.com/creationix/http-parser-js>
-- <https://github.com/nodejs/undici>
 - <https://github.com/faye/websocket-driver-node>
+- <https://github.com/creationix/http-parser-js>
+- <https://github.com/websockets/ws>
+- <https://github.com/nodejs/undici>
+
+## Resources
+
+- <https://www.rfc-editor.org/rfc/rfc6455>
+- <https://websockets.spec.whatwg.org>

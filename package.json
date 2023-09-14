@@ -1,11 +1,9 @@
 {
-  "name": "bun-tcp-websocket",
+  "name": "tcp-websocket",
   "module": "./src/index.ts",
   "type": "module",
   "devDependencies": {
-    "bun-types": "latest"
-  },
-  "peerDependencies": {
+    "bun-types": "latest",
     "typescript": "^5.0.0"
   }
 }

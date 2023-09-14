@@ -8,9 +8,12 @@ import net from "node:net";
 
 import { EventEmitter } from "node:stream";
 import { create_headers, read_response } from "./http";
-import { opcodes } from "./websocket/constants";
-import { WebsocketFrameSend } from "./websocket/frame";
-import { isValidSubprotocol } from "./websocket/utils";
+
+import Frame from "./websocket/frame";
+import { isValidSubprotocol, maskPayload } from "./websocket/utils";
+import StreamReader from "./streams/reader";
+import { FRAME_DATA, OPCODE, ERRORS, FRAME_MAX_LENGTH, MESSAGE_OPCODES, OPENING_OPCODES, MIN_RESERVED_ERROR, MAX_RESERVED_ERROR, DEFAULT_ERROR_CODE, UTF8_MATCH } from "./websocket/constants";
+import Message from "./websocket/message";
 
 const WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
@@ -36,6 +39,7 @@ class TCPWebSocket extends EventEmitter {
   public readyState: number;
 
   #bufferedAmount = 0;
+  #requireMasking = false;
 
   constructor (url: string | URL, options: TCPWebSocketOptions) {
     super();
@@ -155,11 +159,14 @@ class TCPWebSocket extends EventEmitter {
     });
   }
 
-  #onSocketData (buffer: Buffer) {
+  #stream_reader = new StreamReader()
+  
+  #stage = 0
+  #onSocketData (data: Buffer) {
     if (this.readyState === TCPWebSocket.CONNECTING) {
       // This is the response of the HTTP handshake.
-      const response = read_response(buffer);
-      buffer = response.chunk;
+      const response = read_response(data);
+      data = response.chunk;
 
       if (response.informations.statusCode !== 101) {
         throw new Error("expected status code 101");
@@ -184,21 +191,265 @@ class TCPWebSocket extends EventEmitter {
       super.emit("open", response.informations);
     }
 
-    super.emit("message", buffer);
-  }
+    this.#stream_reader.put(data);
+      
+    let buffer: Buffer | null | true = true;
+    
+    while (buffer) {
+      switch (this.#stage) {
+        case 0:
+          buffer = this.#stream_reader.read(1);
+          if (buffer) this.#parseOpcode(buffer[0]);
+          break;
 
-  public send (message: string) {
-    if (typeof message === "string") {
-      const value = Buffer.from(message);
-      const frame = new WebsocketFrameSend(value);
-      const buffer = frame.createFrame(opcodes.TEXT);
+        case 1:
+          buffer = this.#stream_reader.read(1);
+          if (buffer) this.#parseLength(buffer[0]);
+          break;
 
-      this.#bufferedAmount += value.byteLength
-      this.#socket.write(buffer, () => {
-        this.#bufferedAmount -= value.byteLength
-      })
+        case 2:
+          buffer = this.#stream_reader.read(this._frame!.lengthBytes);
+          if (buffer) this.#parseExtendedLength(buffer);
+          break;
+
+        case 3:
+          buffer = this.#stream_reader.read(4);
+          if (buffer) {
+            this.#stage = 4;
+            this._frame!.maskingKey = buffer;
+          }
+          break;
+
+        case 4:
+          // `this._frame.length` since the rest of the buffer is the content/payload
+          buffer = this.#stream_reader.read(this._frame!.length);
+          if (buffer) {
+            // since we read the entire buffer, we put back the stage to 0
+            // to get ready to read (again from start) the next buffer.
+            this.#stage = 0;
+            // that's when we get the message in our TCPWebSocket.on("message")
+            this.#emitFrame(buffer);
+          }
+          break;
+
+        default:
+          buffer = null;
+      }
     }
   }
+
+  private _frame: Frame | undefined
+  #parseOpcode (octet: number): void {
+    const rsvs = [FRAME_DATA.RSV1, FRAME_DATA.RSV2, FRAME_DATA.RSV3].map(rsv => (octet & rsv) === rsv);
+  
+    this._frame = new Frame();
+  
+    this._frame.final = (octet & FRAME_DATA.FIN) === FRAME_DATA.FIN;
+    this._frame.opcode = (octet & FRAME_DATA.OPCODE);
+    this._frame.rsv1 = rsvs[0];
+    this._frame.rsv2 = rsvs[1];
+    this._frame.rsv3 = rsvs[2];
+  
+    this.#stage = 1;
+  
+    // TODO: when we have extensions
+    // if (!this._extensions.validFrameRsv(frame))
+    //   return this._fail('protocol_error',
+    //       'One or more reserved bits are on: reserved1 = ' + (frame.rsv1 ? 1 : 0) +
+    //       ', reserved2 = ' + (frame.rsv2 ? 1 : 0) +
+    //       ', reserved3 = ' + (frame.rsv3 ? 1 : 0));
+  
+    if (Object.values(OPCODE).indexOf(this._frame.opcode) < 0) {
+      this.#fail(ERRORS.PROTOCOL_ERROR, `Unrecognized frame opcode: ${this._frame.opcode}`);
+      return;
+    }
+  
+    if (MESSAGE_OPCODES.indexOf(this._frame.opcode) < 0 && !this._frame.final) {
+      this.#fail(ERRORS.PROTOCOL_ERROR, `Received fragmented control frame: opcode = ${this._frame.opcode}`);
+      return;
+    }
+  
+    // if (this._message && OPENING_OPCODES.indexOf(this._frame.opcode) >= 0)
+    //   return this.#fail(ERRORS.PROTOCOL_ERROR, 'Received new data frame but previous continuous frame is unfinished');
+  }
+
+  #parseLength (octet: number): void {
+    const frame = this._frame!;
+    frame.masked = (octet & FRAME_DATA.MASK) === FRAME_DATA.MASK;
+    frame.length = (octet & FRAME_DATA.LENGTH);
+
+    if (frame.length >= 0 && frame.length <= 125) {
+      this.#stage = frame.masked ? 3 : 4;
+      if (!this.#checkFrameLength()) return;
+    } else {
+      this.#stage = 2;
+      frame.lengthBytes = (frame.length === 126 ? 2 : 8);
+    }
+
+    if (this.#requireMasking && !frame.masked)
+      return this.#fail(ERRORS.UNACCEPTABLE, 'Received unmasked frame but masking is required');
+  }
+
+  #parseExtendedLength (buffer: Buffer): void {
+    const frame = this._frame!;
+    frame.length = this.#readUInt(buffer);
+
+    this.#stage = frame.masked ? 3 : 4;
+
+    if (MESSAGE_OPCODES.indexOf(frame.opcode!) < 0 && frame.length > 125) {
+      return this.#fail(ERRORS.PROTOCOL_ERROR, `Received control frame having too long payload: ${frame.length}`);
+    }
+
+    if (!this.#checkFrameLength()) return;
+  }
+
+  #checkFrameLength (): boolean {
+    const length = this._message ? this._message.length : 0;
+
+    if (length + this._frame!.length > FRAME_MAX_LENGTH) {
+      this.#fail(ERRORS.TOO_LARGE, 'WebSocket frame length too large');
+      return false;
+    }
+
+    return true;
+  }
+
+  private _message: Message | undefined
+  #emitFrame (buffer: Buffer) {
+    const frame  = this._frame!;
+    const payload = frame.payload = maskPayload(buffer, frame.maskingKey);
+    const opcode = frame.opcode;
+
+    let message,
+        code: number | null,
+        reason: string | null,
+        callbacks, callback;
+
+    delete this._frame;
+
+    if (opcode === OPCODE.CONTINUATION) {
+      if (!this._message) {
+        this.#fail(ERRORS.PROTOCOL_ERROR, 'Received unexpected continuation frame');
+        return;
+      }
+
+      this._message.pushFrame(frame);
+    }
+
+    if (opcode === OPCODE.TEXT || opcode === OPCODE.BINARY) {
+      this._message = new Message();
+      this._message.pushFrame(frame);
+    }
+
+    // we emit the message
+    if (this._message && frame.final && opcode && MESSAGE_OPCODES.indexOf(opcode) >= 0) {
+      return this.#emitMessage(this._message);
+    }
+
+    if (opcode === OPCODE.CLOSE) {
+      code = (payload.length >= 2) ? payload.readUInt16BE(0) : null;
+      reason = (payload.length > 2) ? this.#encode(payload.subarray(2)) : null;
+
+      if (
+        payload.length !== 0
+        && !(code && code >= MIN_RESERVED_ERROR && code <= MAX_RESERVED_ERROR)
+        && (code && Object.values(ERRORS).indexOf(code) < 0)
+      ) {
+        code = ERRORS.PROTOCOL_ERROR;
+      }
+
+      if (payload.length > 125 || (payload.length > 2 && !reason)) {
+        code = ERRORS.PROTOCOL_ERROR;
+      }
+
+      this.#shutdown(code ?? DEFAULT_ERROR_CODE, reason ?? "");
+    }
+
+    // if (opcode === OPCODE.PING) {
+    //   this.frame(payload, 'pong');
+    //   this.emit('ping', { data: payload.toString() })
+    // }
+
+    // if (opcode === OPCODE.PONG) {
+    //   callbacks = this._pingCallbacks;
+    //   message   = this.#encode(payload);
+    //   callback  = callbacks[message];
+
+    //   delete callbacks[message];
+    //   if (callback) callback()
+
+    //   this.emit('pong', { data: payload.toString() })
+    // }
+  }
+
+  #emitMessage (message: Message) {
+    message.read();
+
+    delete this._message;
+
+    // this._extensions.processIncomingMessage(message, (error, message) => {
+      // if (error) return this.#fail(ERRORS.EXTENSION_ERROR, error.message);
+
+      let payload: Buffer | string | null = message.data!;
+      if (message.opcode === OPCODE.TEXT) payload = this.#encode(payload);
+
+      if (payload === null)
+        return this.#fail(ERRORS.ENCODING_ERROR, 'Could not decode a text frame as UTF-8');
+      else {
+        super.emit('message', { data: payload });
+      }
+    // });
+  }
+
+  /** shutdown by sending an error. */
+  #fail (error_code: ERRORS, message: string) {
+    if (this.readyState > 1) return;
+    this.#shutdown(error_code, message, true);
+  }
+
+  #shutdown (code: ERRORS, reason: string, is_error = false) {
+    delete this._frame;
+    delete this._message;
+    this.#stage = 5;
+
+    const sendCloseFrame = (this.readyState === 1);
+    this.readyState = 2;
+
+    // this.#extensions.close(() => {
+      // if (sendCloseFrame) this.frame(reason, 'close', code);
+      this.readyState = 3;
+      
+      if (is_error) this.emit('error', new Error(reason));
+      this.emit('close', {code, reason});
+    // });
+  }
+
+  #encode (buffer: Buffer) {
+    try {
+      const string = buffer.toString('binary', 0, buffer.length);
+      if (!UTF8_MATCH.test(string)) return null;
+    } catch {}
+
+    return buffer.toString('utf8', 0, buffer.length);
+  }
+
+  #readUInt (buffer: Buffer) {
+    if (buffer.length === 2) return buffer.readUInt16BE(0);
+    return buffer.readUInt32BE(0) * 0x100000000 + buffer.readUInt32BE(4);
+  }
+
+  // public send (data: TypedArray | ArrayBuffer | Blob | string) {
+  //   if (typeof data === "string") {
+  //     const value = Buffer.from(data);
+  //     const frame = new WebsocketFrameSend(value);
+  //     const buffer = frame.createFrame(opcodes.TEXT);
+
+  //     this.#bufferedAmount += value.byteLength
+  //     this.#socket.write(buffer, () => {
+  //       this.#bufferedAmount -= value.byteLength
+  //     })
+  //   }
+  // }
 }
 
 export default TCPWebSocket;

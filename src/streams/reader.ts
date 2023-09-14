@@ -30,14 +30,14 @@ class StreamReader {
     const first_buffer = this._queue[0];
   
     if (first_buffer.length === n) {
-      console.log("read: return queue shift");
+      // console.log("read: return queue shift");
       return this._queue.shift() as Buffer;
     }
     else if (first_buffer.length > n) {
       const buffer = first_buffer.subarray(0, n);
       this._queue[0] = first_buffer.subarray(n);
       
-      console.log("read: return buffer");
+      // console.log("read: return buffer");
       return buffer;
     }
   
@@ -48,7 +48,7 @@ class StreamReader {
       i++;
     }
 
-    console.log("read: while loop", i, j)
+    // console.log("read: while loop", i, j);
     const buffers = this._queue.splice(0, i);
   
     if (n > 0 && this._queue.length > 0) {

@@ -7,7 +7,8 @@ type StateFunctions = (
 );
 
 export interface ParseInformation {
-  headers: string[];
+  raw_headers: string[];
+  headers: Record<string, string>
   upgrade: boolean;
   
   // filled on `RESPONSE_LINE()`
@@ -79,7 +80,9 @@ class HTTPParser {
 
     // @ts-expect-error
     this.info = {
-      headers: [],
+      raw_headers: [],
+      headers: {},
+      
       upgrade: false
     };
 
@@ -191,7 +194,8 @@ class HTTPParser {
     }
 
     const match = this.#header_exp.exec(line);
-    const key = match && match[1];
+    // headers key is always in lowercase in our implementation.
+    const key = match && match[1].toLowerCase();
     
     if (key) { 
       const value = match[2]; 
@@ -231,22 +235,27 @@ class HTTPParser {
     const line = this.consumeLine();
     if (typeof line === "undefined") return;
 
-    if (line.length > 0) this.parseHeader(line, this.info.headers);
+    if (line.length > 0) this.parseHeader(line, this.info.raw_headers);
     // Line is empty, means we're done parsing the headers.
     else {
-      const headers = this.info.headers;
+      const list_headers = this.info.raw_headers;
 
       let hasContentLength = false;
       let currentContentLengthValue: number;
       let hasUpgradeHeader = false;
 
-      for (let i = 0; i < headers.length; i += 2) {
-        switch (headers[i].toLowerCase()) {
+      for (let i = 0; i < list_headers.length; i += 2) {
+        const key = list_headers[i]
+        const value = list_headers[i + 1];
+
+        this.info.headers[key] = value;
+        
+        switch (key) {
           case 'transfer-encoding':
-            this.isChunked = headers[i + 1].toLowerCase() === 'chunked';
+            this.isChunked = value.toLowerCase() === 'chunked';
             break;
           case 'content-length':
-            currentContentLengthValue = +headers[i + 1];
+            currentContentLengthValue = +value;
             if (hasContentLength) {
               // Fix duplicate Content-Length header with same values.
               // Throw error only if values are different.
@@ -264,7 +273,7 @@ class HTTPParser {
 
             break;
           case 'connection':
-            this.connection += headers[i + 1].toLowerCase();
+            this.connection += value.toLowerCase();
             break;
           case 'upgrade':
             hasUpgradeHeader = true;

@@ -15,6 +15,9 @@
       "default": "./dist/index.bun.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "bun x rimraf ./dist ./tsconfig.tsbuildinfo && bun run build:types && bun run build:bun && bun run build:node",
     "build:node": "bun build ./src/index.ts --target node --format esm --outfile ./dist/index.node.js --splitting --minify",

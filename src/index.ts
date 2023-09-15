@@ -6,14 +6,14 @@ import crypto from "node:crypto";
 import tls from "node:tls";
 import net from "node:net";
 
-import { EventEmitter } from "node:stream";
-import { create_headers, read_response } from "./http";
+import EventEmitter from "node:events";
+import { create_headers, read_response } from "./http/index.js";
 
-import Frame from "./websocket/frame";
-import { isValidSubprotocol, maskPayload } from "./websocket/utils";
-import StreamReader from "./streams/reader";
-import { FRAME_DATA, OPCODE, ERRORS, FRAME_MAX_LENGTH, MESSAGE_OPCODES, OPENING_OPCODES, MIN_RESERVED_ERROR, MAX_RESERVED_ERROR, DEFAULT_ERROR_CODE, UTF8_MATCH } from "./websocket/constants";
-import Message from "./websocket/message";
+import Frame from "./websocket/frame.js";
+import { isValidSubprotocol, maskPayload } from "./websocket/utils.js";
+import StreamReader from "./streams/reader.js";
+import { FRAME_DATA, OPCODE, ERRORS, FRAME_MAX_LENGTH, MESSAGE_OPCODES, OPENING_OPCODES, MIN_RESERVED_ERROR, MAX_RESERVED_ERROR, DEFAULT_ERROR_CODE, UTF8_MATCH } from "./websocket/constants.js";
+import Message from "./websocket/message.js";
 
 const WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
@@ -38,10 +38,7 @@ class TCPWebSocket extends EventEmitter {
   // public readonly extensions: string;
   public readyState: number;
 
-  #bufferedAmount = 0;
-  #requireMasking = false;
-
-  constructor (url: string | URL, options: TCPWebSocketOptions) {
+  constructor (url: string | URL, options: TCPWebSocketOptions = {}) {
     super();
 
     // We transform the string into an URL
@@ -269,8 +266,10 @@ class TCPWebSocket extends EventEmitter {
       return;
     }
   
-    // if (this._message && OPENING_OPCODES.indexOf(this._frame.opcode) >= 0)
-    //   return this.#fail(ERRORS.PROTOCOL_ERROR, 'Received new data frame but previous continuous frame is unfinished');
+    if (this._message && OPENING_OPCODES.indexOf(this._frame.opcode) >= 0) {
+      this.#fail(ERRORS.PROTOCOL_ERROR, 'Received new data frame but previous continuous frame is unfinished');
+      return;
+    }
   }
 
   #parseLength (octet: number): void {
@@ -286,8 +285,12 @@ class TCPWebSocket extends EventEmitter {
       frame.lengthBytes = (frame.length === 126 ? 2 : 8);
     }
 
-    if (this.#requireMasking && !frame.masked)
+    // TODO: make requireMasking configurable
+    const requireMasking = false;
+
+    if (requireMasking && !frame.masked) {
       return this.#fail(ERRORS.UNACCEPTABLE, 'Received unmasked frame but masking is required');
+    }
   }
 
   #parseExtendedLength (buffer: Buffer): void {
@@ -320,11 +323,6 @@ class TCPWebSocket extends EventEmitter {
     const payload = frame.payload = maskPayload(buffer, frame.maskingKey);
     const opcode = frame.opcode;
 
-    let message,
-        code: number | null,
-        reason: string | null,
-        callbacks, callback;
-
     delete this._frame;
 
     if (opcode === OPCODE.CONTINUATION) {
@@ -345,10 +343,10 @@ class TCPWebSocket extends EventEmitter {
     if (this._message && frame.final && opcode && MESSAGE_OPCODES.indexOf(opcode) >= 0) {
       return this.#emitMessage(this._message);
     }
-
+    
     if (opcode === OPCODE.CLOSE) {
-      code = (payload.length >= 2) ? payload.readUInt16BE(0) : null;
-      reason = (payload.length > 2) ? this.#encode(payload.subarray(2)) : null;
+      let code = (payload.length >= 2) ? payload.readUInt16BE(0) : null;
+      const reason = (payload.length > 2) ? this.#encode(payload.subarray(2)) : null;
 
       if (
         payload.length !== 0
@@ -365,26 +363,18 @@ class TCPWebSocket extends EventEmitter {
       this.#shutdown(code ?? DEFAULT_ERROR_CODE, reason ?? "");
     }
 
-    // if (opcode === OPCODE.PING) {
-    //   this.frame(payload, 'pong');
-    //   this.emit('ping', { data: payload.toString() })
-    // }
+    if (opcode === OPCODE.PING) {
+      this.#frame(payload, OPCODE.PING);
+      this.emit('ping', { data: payload.toString() })
+    }
 
-    // if (opcode === OPCODE.PONG) {
-    //   callbacks = this._pingCallbacks;
-    //   message   = this.#encode(payload);
-    //   callback  = callbacks[message];
-
-    //   delete callbacks[message];
-    //   if (callback) callback()
-
-    //   this.emit('pong', { data: payload.toString() })
-    // }
+    if (opcode === OPCODE.PONG) {
+      this.emit('pong', { data: payload.toString() })
+    }
   }
 
   #emitMessage (message: Message) {
     message.read();
-
     delete this._message;
 
     // this._extensions.processIncomingMessage(message, (error, message) => {
@@ -412,15 +402,15 @@ class TCPWebSocket extends EventEmitter {
     delete this._message;
     this.#stage = 5;
 
-    const sendCloseFrame = (this.readyState === 1);
-    this.readyState = 2;
+    const sendCloseFrame = (this.readyState === TCPWebSocket.OPEN);
+    this.readyState = TCPWebSocket.CLOSING;
 
     // this.#extensions.close(() => {
-      // if (sendCloseFrame) this.frame(reason, 'close', code);
-      this.readyState = 3;
+      if (sendCloseFrame) this.#frame(Buffer.from(reason), OPCODE.CLOSE, code);
+      this.readyState = TCPWebSocket.CLOSED;
       
       if (is_error) this.emit('error', new Error(reason));
-      this.emit('close', {code, reason});
+      super.emit('close', { code, reason });
     // });
   }
 
@@ -438,18 +428,145 @@ class TCPWebSocket extends EventEmitter {
     return buffer.readUInt32BE(0) * 0x100000000 + buffer.readUInt32BE(4);
   }
 
-  // public send (data: TypedArray | ArrayBuffer | Blob | string) {
-  //   if (typeof data === "string") {
-  //     const value = Buffer.from(data);
-  //     const frame = new WebsocketFrameSend(value);
-  //     const buffer = frame.createFrame(opcodes.TEXT);
+  public send (data: string | TypedArray | ArrayBuffer | Blob): void {
+    if (this.readyState === TCPWebSocket.CONNECTING) {
+      throw new DOMException("connecting");
+    }
 
-  //     this.#bufferedAmount += value.byteLength
-  //     this.#socket.write(buffer, () => {
-  //       this.#bufferedAmount -= value.byteLength
-  //     })
-  //   }
-  // }
+    if (typeof data === "string") {
+      let buffer = Buffer.from(data, "utf8");
+      return this.#frame(buffer, OPCODE.TEXT);
+    }
+  }
+
+  public ping (message: string | Buffer): void {
+    if (this.readyState === TCPWebSocket.CONNECTING) {
+      throw new DOMException("connecting");
+    }
+
+    if (typeof message === "string") {
+      message = Buffer.from(message, "utf8");
+    }
+
+    return this.#frame(message, OPCODE.PING);
+  }
+
+  public pong (message: string | Buffer): void {
+    if (this.readyState === TCPWebSocket.CONNECTING) {
+      throw new DOMException("connecting");
+    }
+
+    if (typeof message === "string") {
+      message = Buffer.from(message, "utf8");
+    }
+
+    return this.#frame(message, OPCODE.PONG);
+  }
+
+  public close (reason = "", code: number = ERRORS.NORMAL_CLOSURE): void {
+    if (code !== ERRORS.NORMAL_CLOSURE && !(code >= 3000 && code < 5000)) {
+      throw new DOMException("InvalidAccessError");
+    }
+
+    if (this.readyState === TCPWebSocket.CONNECTING) {
+      this.readyState = TCPWebSocket.CLOSED;
+      this.emit('close', { code, reason });
+      this.#socket.end();
+    }
+    else if (this.readyState === TCPWebSocket.OPEN) {
+      this.readyState = TCPWebSocket.CLOSING;
+      // this.#extensions.close(() => {
+        this.#frame(Buffer.from(reason, "utf8"), OPCODE.CLOSE, code);
+      // });
+    }
+  }
+
+  /** frame data, prepare message and send it to socket */
+  #frame (buffer: Buffer, opcode: OPCODE, code?: number): void {
+    // if (this.readyState <= 0) return this._queue([buffer, opcode, code]);
+    if (this.readyState > 2) return;
+
+    const message = new Message();
+        
+    message.rsv1 = message.rsv2 = message.rsv3 = false;
+    message.opcode = opcode;
+        
+    let payload = buffer;
+
+    if (typeof code === "number") {
+      const payload_copy = payload;
+      payload = Buffer.allocUnsafe(2 + payload_copy.length);
+      payload.writeUInt16BE(code, 0);
+      payload_copy.copy(payload, 2);
+    }
+
+    message.data = payload;
+
+    // when the message is ready, we make a frame and send it to the socket.
+    const onMessageReady = (message: Message) => {
+      const frame = new Frame();
+
+      frame.final   = true;
+      frame.masked  = true; // we mask our messages by default
+      frame.rsv1    = message.rsv1;
+      frame.rsv2    = message.rsv2;
+      frame.rsv3    = message.rsv3;
+      frame.opcode  = message.opcode;
+      frame.length  = message.data!.length;
+      frame.payload = message.data!;
+
+      frame.maskingKey = crypto.randomBytes(4);
+
+      this.#sendFrame(frame);
+    };
+
+    if (MESSAGE_OPCODES.indexOf(message.opcode) >= 0) {
+      // this._extensions.processOutgoingMessage(message, (error, message) => {
+        // if (error) return this.#fail(ERRORS.EXTENSION_ERROR, error.message);
+        onMessageReady(message)
+      // });
+    }
+    else {
+      onMessageReady(message);
+    }
+  }
+
+  /** send the given frame to the socket. */
+  #sendFrame (frame: Frame): void {
+    const length = frame.length;
+    const header = (length <= 125) ? 2 : (length <= 65535 ? 4 : 10);
+    const offset = header + (frame.masked ? 4 : 0);
+    let buffer = Buffer.allocUnsafe(offset + length);
+    const masked = frame.masked ? FRAME_DATA.MASK : 0;
+
+    buffer[0] = (frame.final ? FRAME_DATA.FIN : 0)
+              | (frame.rsv1 ? FRAME_DATA.RSV1 : 0)
+              | (frame.rsv2 ? FRAME_DATA.RSV2 : 0)
+              | (frame.rsv3 ? FRAME_DATA.RSV3 : 0)
+              | frame.opcode!;
+
+    if (length <= 125) {
+      buffer[1] = masked | length;
+    }
+    else if (length <= 65535) {
+      buffer[1] = masked | 126;
+      buffer.writeUInt16BE(length, 2);
+    }
+    else {
+      buffer[1] = masked | 127;
+      buffer.writeUInt32BE(Math.floor(length / 0x100000000), 2);
+      buffer.writeUInt32BE(length % 0x100000000, 6);
+    }
+
+    frame.payload!.copy(buffer, offset);
+
+    if (frame.masked) {
+      frame.maskingKey?.copy(buffer, header);
+      buffer = maskPayload(buffer, frame.maskingKey, offset);
+    }
+
+    this.#socket.write(buffer);
+  }
 }
 
 export default TCPWebSocket;

@@ -1,4 +1,4 @@
-import type Frame from "./frame";
+import type Frame from "./frame.js";
 
 class Message {
   public rsv1 = false;

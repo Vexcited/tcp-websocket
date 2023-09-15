@@ -1,5 +1,3 @@
-import { OPCODE, FRAME_DATA } from "./constants";
-
 /**
  * @see https://github.com/nodejs/undici/blob/main/lib/websocket/util.js#L111
  * @see https://datatracker.ietf.org/doc/html/rfc6455

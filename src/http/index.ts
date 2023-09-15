@@ -1,4 +1,4 @@
-import HTTPParser from "./parser";
+import HTTPParser from "./parser.js";
 
 export const create_headers = (path: string, headers: Record<string, string>, body = ""): string => {
   const head = [

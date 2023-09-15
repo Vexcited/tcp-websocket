@@ -2,7 +2,7 @@
   "compilerOptions": {
     "lib": ["ESNext"],
 
-    "moduleResolution": "bundler",
+    "moduleResolution": "Bundler",
     "moduleDetection": "force",
     "module": "ESNext",
     "target": "ESNext",
@@ -11,8 +11,11 @@
     "allowSyntheticDefaultImports": true,
 
     "strict": true,
-    "noEmit": true,
+    "emitDeclarationOnly": true,
     "skipLibCheck": true,
+
+    "rootDir": "src",
+    "outDir": "dist",
     
     "allowJs": true,
     "composite": true,
@@ -24,6 +27,6 @@
     ]
   },
 
-  "include": ["src", "examples"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "examples"]
 }

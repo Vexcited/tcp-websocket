@@ -1,7 +1,38 @@
 {
   "name": "tcp-websocket",
-  "module": "./src/index.ts",
+  "description": "A WebSocket client-only class made with TCP streams.",
+  "version": "0.1.0",
   "type": "module",
+  "main": "./dist/index.bun.js",
+  "module": "./dist/index.bun.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "bun": "./dist/index.bun.js",
+      "node": "./dist/index.node.js",
+      "require": "./dist/index.node.js",
+      "import": "./dist/index.bun.js",
+      "default": "./dist/index.bun.js"
+    }
+  },
+  "scripts": {
+    "build": "bun x rimraf ./dist ./tsconfig.tsbuildinfo && bun run build:types && bun run build:bun && bun run build:node",
+    "build:node": "bun build ./src/index.ts --target node --format esm --outfile ./dist/index.node.js --splitting --minify",
+    "build:bun": "bun build ./src/index.ts --target bun --format esm --outfile ./dist/index.bun.js --splitting --minify",
+    "build:types": "bun x tsc"
+  },
+  "license": "MIT",
+  "author": "Mikkel RINGAUD <mikkel@milescode.dev> (https://github.com)",
+  "repository": {
+    "url": "https://github.com/Vexcited/tcp-websocket",
+    "type": "git"
+  },
+  "bugs": "https://github.com/Vexcited/tcp-websocket/issues",
+  "keywords": [
+    "bun",
+    "tcp",
+    "websocket"
+  ],
   "devDependencies": {
     "bun-types": "latest",
     "typescript": "^5.0.0"

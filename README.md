@@ -4,15 +4,13 @@ Was originally made to resolve this [Bun](https://bun.sh/) issue: <https://githu
 
 Instead of using `node:http` or `node:https`, we use plain TCP sockets to communicate, even for the HTTP request handshake.
 
+Bun support is main priority but it should also support Node.
+Even though the Node support is kind of experimental.
+
 ## Getting started
 
 ```bash
 bun add tcp-websocket
-
-# If usage within Node ¯\_(ツ)_/¯
-pnpm add tcp-websocket
-yarn add tcp-websocket
-npm install tcp-websocket
 ```
 
 ```typescript

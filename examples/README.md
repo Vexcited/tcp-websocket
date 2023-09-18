@@ -1,4 +1,4 @@
-# Examples - `tcp-websocket` 
+# Examples - `tcp-websocket`
 
 Small and easy to understand examples to quickly get started with `tcp-websocket`.
 

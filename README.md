@@ -16,23 +16,37 @@ npm install tcp-websocket
 ```
 
 ```typescript
-import TCPWebSocket from "bun-tcp-websocket";
+import TCPWebSocket from "tcp-websocket";
 
-const ws = new TCPWebSocket("wss://echo-websocket.hoppscotch.io");
+const ws = new TCPWebSocket("wss://ws.postman-echo.com/raw");
+
 ws.on("open", () => {
-  console.info("[open] Connected!");
+  console.info("[open]: connected !\n");
+  
+  const data = "hello world!";
+  ws.send(data);
+  console.info("[send::message]:", data);
 });
 
-ws.on("message", (message: Buffer) => {
-  console.info("[message]", message.toString("utf8"));
+ws.once("message", (event) => {
+  console.info("[receive::message]:", event.data);
+
+  console.info("\n[info]: will close in 5 seconds...");
+  setTimeout(() => ws.close(), 5_000)
+});
+
+ws.on("close", (event) => {
+  console.info(`[close(${event.code})]: ${event.reason || "[no reason provided]"}`)
 });
 ```
+
+You can find more examples @ [`./examples`](./examples/).
 
 ## API
 
 > Warning: `TCPWebSocket` class is not fully compatible with the [`WebSocket` interface](https://websockets.spec.whatwg.org/#the-websocket-interface), yet.
 
-## Why not use those librairies ?
+## Why not use those libraries ?
 
 Packages using `node:http` or `node:https` to make the request handshake
 will fail in Bun since their implementation is kinda broken.
@@ -48,7 +62,7 @@ will fail in Bun since their implementation is kinda broken.
 ## Development
 
 ```bash
-git clone https://github.com/Vexcited/bun-tcp-websocket
+git clone https://github.com/Vexcited/tcp-websocket
 
 # Install dependencies
 bun install
@@ -69,3 +83,4 @@ You can run the main examples located in [`./src/examples`](./src/examples)  usi
 
 - <https://www.rfc-editor.org/rfc/rfc6455>
 - <https://websockets.spec.whatwg.org>
+- <https://developer.mozilla.org/docs/Web/API/WebSocket>

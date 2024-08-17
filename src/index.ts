@@ -364,7 +364,7 @@ class TCPWebSocket extends EventEmitter {
     }
 
     if (opcode === OPCODE.PING) {
-      this.#frame(payload, OPCODE.PING);
+      this.#frame(payload, OPCODE.PONG);
       this.emit('ping', { data: payload.toString() })
     }
 

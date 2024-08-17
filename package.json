@@ -19,7 +19,26 @@
   "scripts": {
     "build": "bun x rimraf ./dist ./tsconfig.tsbuildinfo && bun run build:types && bun run build:bun",
     "build:bun": "bun build ./src/index.ts --target bun --sourcemap=external --format esm --outdir ./dist --minify",
-    "build:types": "bun x tsc"
+    "build:types": "bun x tsc",
+    "release": "release-it"
+  },
+  "release-it": {
+    "git": {
+      "commitMessage": "chore: release v${version}",
+      "tagAnnotation": "Release v${version}",
+      "tagName": "js-v${version}"
+    },
+    "github": {
+      "draft": false,
+      "release": true,
+      "releaseName": "js v${version}"
+    },
+    "npm": {
+      "publish": true
+    },
+    "hooks": {
+      "before:init": "bun run build"
+    }
   },
   "license": "MIT",
   "author": "Mikkel ALMONTE--RINGAUD <vexitofficial@gmail.com> (https://github.com/Vexcited)",
@@ -31,7 +50,8 @@
     "websocket"
   ],
   "devDependencies": {
-    "bun-types": "latest",
-    "typescript": "^5.0.0"
+    "@types/bun": "^1.1.6",
+    "release-it": "^17.6.0",
+    "typescript": "^5.5.4"
   }
 }

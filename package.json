@@ -7,13 +7,11 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "bun": "./dist/index.js",
-      "node": "./dist/index.js",
-      "require": "./dist/index.js",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
+    "bun": "./dist/index.js",
+    "node": "./dist/index.js",
+    "require": "./dist/index.js",
+    "import": "./dist/index.js",
+    "default": "./dist/index.js"
   },
   "files": [
     "dist"
@@ -24,11 +22,8 @@
     "build:types": "bun x tsc"
   },
   "license": "MIT",
-  "author": "Mikkel RINGAUD <mikkel@milescode.dev> (https://github.com)",
-  "repository": {
-    "url": "https://github.com/Vexcited/tcp-websocket",
-    "type": "git"
-  },
+  "author": "Mikkel ALMONTE--RINGAUD <vexitofficial@gmail.com> (https://github.com/Vexcited)",
+  "repository": "https://github.com/Vexcited/tcp-websocket",
   "bugs": "https://github.com/Vexcited/tcp-websocket/issues",
   "keywords": [
     "bun",

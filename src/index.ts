@@ -428,7 +428,7 @@ class TCPWebSocket extends EventEmitter {
     return buffer.readUInt32BE(0) * 0x100000000 + buffer.readUInt32BE(4);
   }
 
-  public send (data: string | TypedArray | ArrayBuffer | Blob): void {
+  public send (data: string | ArrayBuffer | Blob): void {
     if (this.readyState === TCPWebSocket.CONNECTING) {
       throw new DOMException("connecting");
     }

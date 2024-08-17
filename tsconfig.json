@@ -1,7 +1,5 @@
 {
   "compilerOptions": {
-    "lib": ["ESNext"],
-
     "moduleResolution": "Bundler",
     "moduleDetection": "force",
     "module": "ESNext",
@@ -20,11 +18,7 @@
     "allowJs": true,
     "composite": true,
     "downlevelIteration": true,
-    "forceConsistentCasingInFileNames": true,
-
-    "types": [
-      "bun-types"
-    ]
+    "forceConsistentCasingInFileNames": true
   },
 
   "include": ["src"],

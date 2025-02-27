@@ -19,44 +19,40 @@ class StreamReader {
     this._queueSize += buffer.length;
   };
   
-  read (n: number): Buffer | null {
+  read(n: number): Buffer | null {
     if (n > this._queueSize) return null;
     if (n === 0) return Buffer.alloc(0);
-  
-    // update the buffer size in queue.
+
     this._queueSize -= n;
-  
-    // get the first buffer in queue for easier reference
+
     const first_buffer = this._queue[0];
-  
+
     if (first_buffer.length === n) {
-      // console.log("read: return queue shift");
-      return this._queue.shift() as Buffer;
-    }
-    else if (first_buffer.length > n) {
+      return this._queue.shift()!;
+    } else if (first_buffer.length > n) {
       const buffer = first_buffer.subarray(0, n);
       this._queue[0] = first_buffer.subarray(n);
-      
-      // console.log("read: return buffer");
       return buffer;
     }
-  
-    let i = 0, j = this._queue.length;
-    while (i < j) {
-      if (j < this._queue[i].length) break;
-      j -= this._queue[i].length;
-      i++;
+
+    let totalBytesRead = 0;
+    const buffersToConcat: Buffer[] = [];
+
+    for (let i = 0; i < this._queue.length;) {
+      const currentBuffer = this._queue[i];
+      if (totalBytesRead + currentBuffer.length <= n) {
+        buffersToConcat.push(currentBuffer);
+        totalBytesRead += currentBuffer.length;
+        this._queue.shift(); // remove the buffer from the queue
+      } else {
+        const remainingBytes = n - totalBytesRead;
+        buffersToConcat.push(currentBuffer.subarray(0, remainingBytes));
+        this._queue[i] = currentBuffer.subarray(remainingBytes);
+        break;
+      }
     }
 
-    // console.log("read: while loop", i, j);
-    const buffers = this._queue.splice(0, i);
-  
-    if (n > 0 && this._queue.length > 0) {
-      buffers.push(this._queue[0].subarray(0, n));
-      this._queue[0] = this._queue[0].subarray(n);
-    }
-    
-    return Buffer.concat(buffers, n);
+    return Buffer.concat(buffersToConcat, n);
   };
 }
 

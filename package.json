@@ -7,10 +7,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    "bun": "./dist/index.js",
-    "node": "./dist/index.js",
-    "require": "./dist/index.js",
-    "import": "./dist/index.js",
+    "types": "./dist/index.d.ts",
     "default": "./dist/index.js"
   },
   "files": [
@@ -41,7 +38,7 @@
     }
   },
   "license": "MIT",
-  "author": "Mikkel ALMONTE--RINGAUD <vexitofficial@gmail.com> (https://github.com/Vexcited)",
+  "author": "Mikkel ALMONTE--RINGAUD <contact@vexcited.com> (https://github.com/Vexcited)",
   "repository": "https://github.com/Vexcited/tcp-websocket",
   "bugs": "https://github.com/Vexcited/tcp-websocket/issues",
   "keywords": [
@@ -50,8 +47,8 @@
     "websocket"
   ],
   "devDependencies": {
-    "@types/bun": "^1.1.6",
-    "release-it": "^17.6.0",
-    "typescript": "^5.5.4"
+    "@types/bun": "^1.2.4",
+    "release-it": "^18.1.2",
+    "typescript": "^5.7.3"
   }
 }

@@ -1,6 +1,6 @@
 # `tcp-websocket`
 
-Was originally made to resolve this [Bun](https://bun.sh/) issue: <https://github.com/oven-sh/bun/issues/4529> (still not fixed)
+Was originally made to resolve this [Bun](https://bun.sh/) issue: <https://github.com/oven-sh/bun/issues/4529> (even if it's closed, the issue still persists...)
 
 Instead of using `node:http` or `node:https`, we use plain TCP sockets to communicate, even for the HTTP request handshake.
 
@@ -54,7 +54,7 @@ will fail in Bun since their implementation is kinda broken.
 | [`ws`](https://www.npmjs.com/package/ws) | Uses the `node:http` and `node:https` to make the request handshake. [Source](https://github.com/websockets/ws/blob/7460049ff0a61bef8d5eda4b1d5c8170bc7d6b6f/lib/websocket.js#L715) |
 | [`websocket`](https://www.npmjs.com/package/websocket) | Uses the `node:http` and `node:https` to make the request handshake. [Source](https://github.com/theturtle32/WebSocket-Node/blob/cce6d468986dd356a52af5630fd8ed5726ba5b7a/lib/WebSocketClient.js#L254) |
 | [`websocket-stream`](https://www.npmjs.com/package/websocket-stream) | Uses the `ws` package internally, see `ws`. [Source](https://github.com/maxogden/websocket-stream/blob/feeb372ff530621d6df85cb85d4bee03b879c54d/stream.js#L5) |
-| [`undici`](https://npmjs.com/package/undici) | Uses `http2` under the hood which is currently [not implemented in Bun](https://bun.sh/docs/runtime/nodejs-apis#node-http2). [Source](https://github.com/nodejs/undici/blob/e39a6324c4474c6614cac98b8668e3d036aa6b18/lib/client.js#L1231) |
+| [`undici`](https://npmjs.com/package/undici) | Bun patches `undici` under the hood, resulting in it being useless to us. A fork might work though. [Source 1](https://github.com/oven-sh/bun/blob/b124ba056cfdafad7828f86a852a83722f17f8a5/src/js/thirdparty/undici.js), [Source 2](https://github.com/oven-sh/bun/blob/b124ba056cfdafad7828f86a852a83722f17f8a5/src/bun.js/bindings/Undici.cpp) |
 | [`websocket-driver`](https://www.npmjs.com/package/websocket-driver) | Works with Bun, but last update was 3 years ago with no TS declarations and ES5 syntax. This package reuses a lot of code from this package. |
 
 ## Development

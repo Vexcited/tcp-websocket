@@ -1,6 +1,3 @@
-/// Resources used:
-/// <https://github.com/nodejs/undici/blob/main/lib/websocket/websocket.js>
-
 import crypto from "node:crypto";
 
 import tls from "node:tls";

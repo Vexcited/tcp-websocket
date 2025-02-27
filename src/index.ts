@@ -122,7 +122,7 @@ class TCPWebSocket extends EventEmitter {
      */
     this.#key = crypto.randomBytes(16).toString('base64');
     this.#headers["Sec-WebSocket-Key"] = this.#key;
-  
+
     // TODO: We add the authentication header, in case it was passed in the URL.
     // const auth = (this.url.username && this.url.password) ? `${this.url.username}:${this.url.password}` : null;
     // if (auth) {
@@ -134,7 +134,7 @@ class TCPWebSocket extends EventEmitter {
 
     // Take the port from the `uri` if defined, else 443 if `wss:`, 80 for `ws:`.
     const port = this.url.port ? parseInt(this.url.port) : is_secure ? 443 : 80;
-    
+
     this.#socket = is_secure
       ? tls.connect(port, this.url.hostname)
       : net.connect(port, this.url.hostname);
@@ -154,7 +154,7 @@ class TCPWebSocket extends EventEmitter {
   }
 
   #stream_reader = new StreamReader()
-  
+
   #stage = 0
   #onSocketData (data: Buffer) {
     if (this.readyState === TCPWebSocket.CONNECTING) {
@@ -186,9 +186,9 @@ class TCPWebSocket extends EventEmitter {
     }
 
     this.#stream_reader.put(data);
-      
+
     let buffer: Buffer | null | true = true;
-    
+
     while (buffer) {
       switch (this.#stage) {
         case 0:
@@ -235,34 +235,34 @@ class TCPWebSocket extends EventEmitter {
   private _frame: Frame | undefined
   #parseOpcode (octet: number): void {
     const rsvs = [FRAME_DATA.RSV1, FRAME_DATA.RSV2, FRAME_DATA.RSV3].map(rsv => (octet & rsv) === rsv);
-  
+
     this._frame = new Frame();
-  
+
     this._frame.final = (octet & FRAME_DATA.FIN) === FRAME_DATA.FIN;
     this._frame.opcode = (octet & FRAME_DATA.OPCODE);
     this._frame.rsv1 = rsvs[0];
     this._frame.rsv2 = rsvs[1];
     this._frame.rsv3 = rsvs[2];
-  
+
     this.#stage = 1;
-  
+
     // TODO: when we have extensions
     // if (!this._extensions.validFrameRsv(frame))
     //   return this._fail('protocol_error',
     //       'One or more reserved bits are on: reserved1 = ' + (frame.rsv1 ? 1 : 0) +
     //       ', reserved2 = ' + (frame.rsv2 ? 1 : 0) +
     //       ', reserved3 = ' + (frame.rsv3 ? 1 : 0));
-  
+
     if (Object.values(OPCODE).indexOf(this._frame.opcode) < 0) {
       this.#fail(ERRORS.PROTOCOL_ERROR, `Unrecognized frame opcode: ${this._frame.opcode}`);
       return;
     }
-  
+
     if (MESSAGE_OPCODES.indexOf(this._frame.opcode) < 0 && !this._frame.final) {
       this.#fail(ERRORS.PROTOCOL_ERROR, `Received fragmented control frame: opcode = ${this._frame.opcode}`);
       return;
     }
-  
+
     if (this._message && OPENING_OPCODES.indexOf(this._frame.opcode) >= 0) {
       this.#fail(ERRORS.PROTOCOL_ERROR, 'Received new data frame but previous continuous frame is unfinished');
       return;
@@ -340,7 +340,7 @@ class TCPWebSocket extends EventEmitter {
     if (this._message && frame.final && opcode && MESSAGE_OPCODES.indexOf(opcode) >= 0) {
       return this.#emitMessage(this._message);
     }
-    
+
     if (opcode === OPCODE.CLOSE) {
       let code = (payload.length >= 2) ? payload.readUInt16BE(0) : null;
       const reason = (payload.length > 2) ? this.#encode(payload.subarray(2)) : null;
@@ -405,7 +405,7 @@ class TCPWebSocket extends EventEmitter {
     // this.#extensions.close(() => {
       if (sendCloseFrame) this.#frame(Buffer.from(reason), OPCODE.CLOSE, code);
       this.readyState = TCPWebSocket.CLOSED;
-      
+
       if (is_error) this.emit('error', new Error(reason));
       super.emit('close', { code, reason });
     // });
@@ -484,17 +484,17 @@ class TCPWebSocket extends EventEmitter {
     if (this.readyState > 2) return;
 
     const message = new Message();
-        
+
     message.rsv1 = message.rsv2 = message.rsv3 = false;
     message.opcode = opcode;
-        
+
     let payload = buffer;
 
     if (typeof code === "number") {
       const payload_copy = payload;
       payload = Buffer.allocUnsafe(2 + payload_copy.length);
       payload.writeUInt16BE(code, 0);
-      payload_copy.copy(payload, 2);
+      payload_copy.copy(new Uint8Array(payload.buffer), 2);
     }
 
     message.data = payload;
@@ -555,14 +555,14 @@ class TCPWebSocket extends EventEmitter {
       buffer.writeUInt32BE(length % 0x100000000, 6);
     }
 
-    frame.payload!.copy(buffer, offset);
+    frame.payload!.copy(new Uint8Array(buffer.buffer), offset);
 
     if (frame.masked) {
-      frame.maskingKey?.copy(buffer, header);
+      frame.maskingKey?.copy(new Uint8Array(buffer.buffer), header);
       buffer = maskPayload(buffer, frame.maskingKey, offset);
     }
 
-    this.#socket.write(buffer);
+    this.#socket.write(new Uint8Array(buffer.buffer));
   }
 }
 

@@ -18,6 +18,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "lint": "eslint",
     "release": "release-it"
   },
   "files": [
@@ -59,6 +60,10 @@
     "websocket"
   ],
   "devDependencies": {
+    "@stylistic/eslint-plugin": "^4.1.0",
+    "@typescript-eslint/parser": "^8.25.0",
+    "eslint": "^9.21.0",
+    "eslint-plugin-perfectionist": "^4.9.0",
     "release-it": "^18.1.2",
     "terser": "^5.39.0",
     "tsup": "^8.4.0",

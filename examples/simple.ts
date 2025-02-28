@@ -1,7 +1,7 @@
 import WebSocket from "tcp-websocket";
 
 const ws = new WebSocket("wss://ws.postman-echo.com/raw");
-console.info("connecting...")
+console.info("connecting...");
 
 ws.onopen = () => {
   console.info("[open]: connected");

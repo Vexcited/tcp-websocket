@@ -1,6 +1,7 @@
+import type { WebSocket as _WST, WebSocketInit } from "undici";
+
 // @ts-expect-error : not defined in types.
 import { WebSocket as _WS } from "undici/lib/web/websocket/websocket.js";
-import type { WebSocket as _WST, WebSocketInit } from "undici";
 
 export type { WebSocketEventMap } from "undici";
 export type { WebSocketInit };

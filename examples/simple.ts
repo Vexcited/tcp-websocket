@@ -1,23 +1,20 @@
-// Outside of this repository, replace "../src" with "tcp-websocket".
-import TCPWebSocket from "../src";
+import WebSocket from "tcp-websocket";
 
-const ws = new TCPWebSocket("wss://ws.postman-echo.com/raw");
+const ws = new WebSocket("wss://ws.postman-echo.com/raw");
+console.info("connecting...")
 
-ws.on("open", () => {
-  console.info("[open]: connected !\n");
-  
-  const data = "hello world!";
-  ws.send(data);
-  console.info("[send::message]:", data);
-});
+ws.onopen = () => {
+  console.info("[open]: connected");
+  ws.send("hello world!");
 
-ws.once("message", (event) => {
-  console.info("[receive::message]:", event.data);
+  console.info("[open]: will close in 5 seconds...");
+  setTimeout(() => ws.close(), 5_000);
+};
 
-  console.info("\n[info]: will close in 5 seconds...");
-  setTimeout(() => ws.close(), 5_000)
-});
+ws.onmessage = (event) => {
+  console.info("[message]:", event.data);
+};
 
-ws.on("close", (event) => {
-  console.info(`[close(${event.code})]: ${event.reason || "[no reason provided]"}`)
-});
+ws.onclose = (event) => {
+  console.info(`[close(${event.code})]: ${event.reason || "[no reason provided]"}`);
+};

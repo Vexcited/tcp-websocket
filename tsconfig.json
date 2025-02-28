@@ -1,26 +1,23 @@
 {
   "compilerOptions": {
-    "moduleResolution": "Bundler",
-    "moduleDetection": "force",
-    "module": "ESNext",
     "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
 
-    "allowImportingTsExtensions": true,
-    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "tcp-websocket": ["src/index.ts"],
+    },
 
     "strict": true,
-    "emitDeclarationOnly": true,
+    "noEmit": true,
     "skipLibCheck": true,
 
-    "rootDir": "src",
-    "outDir": "dist",
-    
-    "allowJs": true,
-    "composite": true,
-    "downlevelIteration": true,
-    "forceConsistentCasingInFileNames": true
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
   },
 
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "examples"]
+  "include": ["src", "examples", "tsup.config.ts"],
+  "exclude": ["node_modules", "dist"]
 }

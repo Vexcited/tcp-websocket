@@ -1,24 +1,28 @@
 {
   "name": "tcp-websocket",
-  "description": "A WebSocket client-only class made with TCP streams.",
+  "description": "A re-export of WebSocket from undici for compatibility with Bun.",
   "version": "0.3.0",
-  "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
-  "module": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
-    "types": "./dist/index.d.ts",
-    "default": "./dist/index.js"
+    "import": {
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
+    },
+    "require": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "release": "release-it"
   },
   "files": [
     "dist"
   ],
-  "scripts": {
-    "build": "bun x rimraf ./dist ./tsconfig.tsbuildinfo && bun run build:types && bun run build:bun",
-    "build:bun": "bun build ./src/index.ts --target bun --sourcemap=external --format esm --outdir ./dist --minify",
-    "build:types": "bun x tsc",
-    "release": "release-it"
-  },
   "release-it": {
     "git": {
       "commitMessage": "chore: release v${version}",
@@ -34,21 +38,33 @@
       "publish": true
     },
     "hooks": {
-      "before:init": "bun run build"
+      "before:init": "pnpm build"
     }
   },
   "license": "MIT",
-  "author": "Mikkel ALMONTE--RINGAUD <contact@vexcited.com> (https://github.com/Vexcited)",
-  "repository": "https://github.com/Vexcited/tcp-websocket",
+  "author": {
+    "name": "Mikkel ALMONTE--RINGAUD",
+    "email": "contact@vexcited.com",
+    "url": "https://www.vexcited.com/"
+  },
+  "repository": {
+    "url": "git+https://github.com/Vexcited/tcp-websocket.git"
+  },
   "bugs": "https://github.com/Vexcited/tcp-websocket/issues",
   "keywords": [
     "bun",
     "tcp",
+    "client",
+    "undici",
     "websocket"
   ],
   "devDependencies": {
-    "@types/bun": "^1.2.4",
     "release-it": "^18.1.2",
+    "terser": "^5.39.0",
+    "tsup": "^8.4.0",
     "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "undici": "^7.3.0"
   }
 }
